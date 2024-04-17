@@ -1,7 +1,7 @@
 const allowedOrigins = [
-  'https://localhost:5173',
+  'http://localhost:5173',
   'https://www.risingfounder.io',
   'https://risingfounder.io'
-]
+];
 
-module.exports = allowedOrigins
+module.exports = allowedOrigins;

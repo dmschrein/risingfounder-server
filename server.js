@@ -1,105 +1,150 @@
-const express = require('express')
-const cors = require('cors')
-const app = express()
-const User = require("./models/User")
-const QuizUser = require("./models/QuizUser")
-const blogs = require('./blog/blogsData.json')
 require('dotenv').config()
+const express = require('express')
+
+const path = require('path')
+const { logger, logEvents } = require('./middleware/logger')
+const errorHandler = require('./middleware/errorHandler')
+const cookieParser = require('cookie-parser')
+const cors = require('cors')
+const corsOptions = require('./config/corsOptions')
+const app = express()
 const { mongoose } = require('mongoose')
+const connectDB = require('./config/dbConn')
+const PORT = process.env.PORT || 3500
+
+// const User = require("./models/User")
+// const QuizUser = require("./models/QuizUser")
+// const blogs = require('./blog/blogsData.json')
+
+console.log(process.env.NODE_ENV)
+
+connectDB()
+
+app.use(logger);
+
+app.use(cors(corsOptions));
 
 app.use(express.json())
-app.use(
-  cors({
-    credentials: true,
-    origin: process.env.CORS_ORIGIN || "http://localhost:5173"
-  })
-)
 
-mongoose.connect(process.env.MONGO_URL)
-console.log(process.env.MONGO_URL)
+app.use(cookieParser())
 
-app.get('/test', (req, res) => {
-  res.json('Test Works')
-})
+app.use('/', express.static(path.join(__dirname, 'public')))
 
-// Register Route
-app.post("/register", async(req, res) => {
-  const {username, email, password, firstName, lastName, company, marketingGoals, marketingPlatforms, marketingPainpoints, marketingPainpointsWhy} = req.body
-  try {
-    const userInfo = await User.create({
-      username,
-      email,
-      password,
-      firstName,
-      lastName,
-      company,
-      marketingGoals,
-      marketingPlatforms,
-      marketingPainpoints,
-      marketingPainpointsWhy
-    })
-    res.json(userInfo)
-  } catch (error) {
-    res.status(422).json(error)
+app.use('/', require('./routes/root'))
+app.use('/quizzes', require('./routes/quizRoute'))
+
+app.all('*', (req, res) => {
+  res.status(404);
+  if (req.accepts('html')) {
+    res.sendFile(path.join(__dirname, 'views', '404.html'));
+  } else if (req.accepts('json')) {
+    res.json({ message: '404 Not Found' });
+  } else {
+    res.type('txt').send('404 Not Found');
   }
-})
-
-// Submit Route
-app.post("/submit", async(req, res) => {
-  const {industryCategories, companyValues, marketingGoals, marketingPlatforms, marketingPainpoints, marketingPainpointsWhy, brandPersonality, firstName, lastName, company, email, username, password} = req.body
-  try {
-    const quizUserInfo = await QuizUser.create({
-      industryCategories,
-      companyValues,
-      marketingGoals,
-      marketingPlatforms,
-      marketingPainpoints,
-      marketingPainpointsWhy,
-      brandPersonality,
-      firstName,
-      lastName,
-      company,
-      email,
-      username,
-      password
-    })
-    res.json(quizUserInfo)
-  } catch (error) {
-    res.status(422).json(error)
-  }
-})
-
-app.get('/blogs', (req, res) => {
-  res.send(blogs)
-})
-app.get('/blogs/:id', (req, res) => {
-  const id = parseInt(req.params.id);
-  // console.log(id)
-  const blog = blogs.filter(b => b.id === id);
-  // console.log(blog)
-  res.send(blog)
-})
-
-// subscribe route
-app.post('/subscribe', async (req, res) => {
-  const {email} = req.body;
-  if (!email) {
-    return res.status(400).send('Email is required.')
-  }
-  try {
-    const newEmail = new EmailInfo({ email })
-    await newEmail.save()
-    res.status(201).send('Subscription successful.')
-  } catch (error) {
-    if (error.code === 11000) {
-      req.status(409).send('Email already subscribed.')
-    } else {
-      res.status(500).send('Error subscribing email.')
-    }
-  }
-})
-
-const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
 });
+
+app.use(errorHandler)
+
+mongoose.connection.once('open', () => {
+  console.log('Connected to MongoDB')
+  app.listen(PORT, () => console.log(`Server running on port ${PORT}`))
+})
+
+mongoose.connection.on('error', err => {
+  console.log(err)
+  logEvents(`${err.no}: ${err.code}\t${err.syscall}\t${err.hostname}`, 'mongoErrLog.log')
+})
+
+
+
+
+// app.use(
+//   cors({
+//     credentials: true,
+//     origin: process.env.CORS_ORIGIN || "http://localhost:5173"
+//   })
+// )
+
+// app.get('/test', (req, res) => {
+//   res.json('Test Works')
+// })
+
+// // Register Route
+// app.post("/register", async(req, res) => {
+//   const {username, email, password, firstName, lastName, company, marketingGoals, marketingPlatforms, marketingPainpoints, marketingPainpointsWhy} = req.body
+//   try {
+//     const userInfo = await User.create({
+//       username,
+//       email,
+//       password,
+//       firstName,
+//       lastName,
+//       company,
+//       marketingGoals,
+//       marketingPlatforms,
+//       marketingPainpoints,
+//       marketingPainpointsWhy
+//     })
+//     res.json(userInfo)
+//   } catch (error) {
+//     res.status(422).json(error)
+//   }
+// })
+
+// // Submit Route
+// app.post("/submit", async(req, res) => {
+//   const {industryCategories, companyValues, marketingGoals, marketingPlatforms, marketingPainpoints, marketingPainpointsWhy, brandPersonality, firstName, lastName, company, email, username, password} = req.body
+//   try {
+//     const quizUserInfo = await QuizUser.create({
+//       industryCategories,
+//       companyValues,
+//       marketingGoals,
+//       marketingPlatforms,
+//       marketingPainpoints,
+//       marketingPainpointsWhy,
+//       brandPersonality,
+//       firstName,
+//       lastName,
+//       company,
+//       email,
+//       username,
+//       password
+//     })
+//     res.json(quizUserInfo)
+//   } catch (error) {
+//     res.status(422).json(error)
+//   }
+// })
+
+// app.get('/blogs', (req, res) => {
+//   res.send(blogs)
+// })
+// app.get('/blogs/:id', (req, res) => {
+//   const id = parseInt(req.params.id);
+//   // console.log(id)
+//   const blog = blogs.filter(b => b.id === id);
+//   // console.log(blog)
+//   res.send(blog)
+// })
+
+// // subscribe route
+// app.post('/subscribe', async (req, res) => {
+//   const {email} = req.body;
+//   if (!email) {
+//     return res.status(400).send('Email is required.')
+//   }
+//   try {
+//     const newEmail = new EmailInfo({ email })
+//     await newEmail.save()
+//     res.status(201).send('Subscription successful.')
+//   } catch (error) {
+//     if (error.code === 11000) {
+//       req.status(409).send('Email already subscribed.')
+//     } else {
+//       res.status(500).send('Error subscribing email.')
+//     }
+//   }
+// })
+
+
